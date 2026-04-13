@@ -6101,8 +6101,7 @@ impl App {
             Some(thread_id) => Some(thread_id),
             None => {
                 self.chat_widget.add_error_message(
-                    "A thread must contain at least one turn before it can be forked."
-                        .to_string(),
+                    "A thread must contain at least one turn before it can be forked.".to_string(),
                 );
                 None
             }
@@ -6672,7 +6671,9 @@ mod tests {
             other => panic!("expected fork error history cell, saw {other:?}"),
         };
         let rendered = lines_to_single_string(&cell.display_lines(/*width*/ 120));
-        assert!(rendered.contains("A thread must contain at least one turn before it can be forked."));
+        assert!(
+            rendered.contains("A thread must contain at least one turn before it can be forked.")
+        );
     }
 
     #[tokio::test]
