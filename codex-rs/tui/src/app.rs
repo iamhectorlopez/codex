@@ -4268,7 +4268,7 @@ impl App {
                 );
                 self.chat_widget
                     .add_plain_history_lines(vec!["/fork".magenta().into()]);
-                if let Some(thread_id) = self.chat_widget.thread_id() {
+                if let Some(thread_id) = self.current_forkable_thread_id() {
                     self.refresh_in_memory_config_from_disk_best_effort("forking the thread")
                         .await;
                     match app_server.fork_thread(self.config.clone(), thread_id).await {
@@ -4307,11 +4307,6 @@ impl App {
                             ));
                         }
                     }
-                } else {
-                    self.chat_widget.add_error_message(
-                        "A thread must contain at least one turn before it can be forked."
-                            .to_string(),
-                    );
                 }
 
                 tui.frame_requester().schedule_frame();
@@ -6101,6 +6096,18 @@ impl App {
         };
     }
 
+    fn current_forkable_thread_id(&mut self) -> Option<ThreadId> {
+        match self.chat_widget.thread_id() {
+            Some(thread_id) => Some(thread_id),
+            None => {
+                self.chat_widget.add_error_message(
+                    "A thread must contain at least one turn before it can be forked.".to_string(),
+                );
+                None
+            }
+        }
+    }
+
     fn refresh_status_line(&mut self) {
         self.chat_widget.refresh_status_line();
     }
@@ -6651,6 +6658,22 @@ mod tests {
         };
         let rendered = lines_to_single_string(&cell.display_lines(/*width*/ 80));
         assert!(rendered.contains("Already viewing /tmp/project."));
+    }
+
+    #[tokio::test]
+    async fn current_forkable_thread_id_reports_missing_thread() {
+        let (mut app, mut app_event_rx, _op_rx) = make_test_app_with_channels().await;
+
+        assert_eq!(app.current_forkable_thread_id(), None);
+
+        let cell = match app_event_rx.try_recv() {
+            Ok(AppEvent::InsertHistoryCell(cell)) => cell,
+            other => panic!("expected fork error history cell, saw {other:?}"),
+        };
+        let rendered = lines_to_single_string(&cell.display_lines(/*width*/ 120));
+        assert!(
+            rendered.contains("A thread must contain at least one turn before it can be forked.")
+        );
     }
 
     #[tokio::test]
