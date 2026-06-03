@@ -1733,6 +1733,25 @@ Setting the app value to `"user"` routes its approval prompts to the user
 instead of Guardian; setting it to `"auto_review"` opts that app into Guardian
 review when allowed by configuration requirements.
 
+App config may also define account aliases. These aliases are advisory,
+model-facing routing metadata only; they do not create credentials or additional
+OAuth sessions. When aliases are present, Codex includes the account guidance in
+the Apps instructions for enabled, accessible apps:
+
+```toml
+[apps.demo-app]
+default_account = "personal"
+ask_account_when_unspecified = false
+
+[apps.demo-app.accounts.personal]
+name = "Personal"
+description = "Use for family and personal tasks."
+
+[apps.demo-app.accounts.work]
+name = "Work"
+description = "Use for company mail and projects."
+```
+
 Invoke an app by inserting `$<app-slug>` in the text input. The slug is derived from the app name and lowercased with non-alphanumeric characters replaced by `-` (for example, "Demo App" becomes `$demo-app`). Add a `mention` input item (recommended) so the server uses the exact `app://<connector-id>` path rather than guessing by name. Plugins use the same `mention` item shape, but with `plugin://<plugin-name>@<marketplace-name>` paths from `plugin/installed` or `plugin/list`.
 
 Example:

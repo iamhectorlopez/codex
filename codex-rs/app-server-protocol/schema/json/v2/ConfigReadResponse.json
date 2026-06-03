@@ -17,8 +17,36 @@
       },
       "type": "object"
     },
+    "AppAccountConfig": {
+      "properties": {
+        "default": {
+          "default": false,
+          "type": "boolean"
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
     "AppConfig": {
       "properties": {
+        "accounts": {
+          "additionalProperties": {
+            "$ref": "#/definitions/AppAccountConfig"
+          },
+          "default": {},
+          "type": "object"
+        },
         "approvals_reviewer": {
           "anyOf": [
             {
@@ -27,6 +55,18 @@
             {
               "type": "null"
             }
+          ]
+        },
+        "ask_account_when_unspecified": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "default_account": {
+          "type": [
+            "string",
+            "null"
           ]
         },
         "default_tools_approval_mode": {

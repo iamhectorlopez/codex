@@ -1,5 +1,6 @@
 use super::*;
 use pretty_assertions::assert_eq;
+use std::collections::HashMap;
 
 #[test]
 fn deserialize_skill_config_with_name_selector() {
@@ -83,6 +84,61 @@ fn memories_config_clamps_rate_limit_remaining_threshold() {
         MemoriesConfig {
             min_rate_limit_remaining_percent: 0,
             ..MemoriesConfig::default()
+        }
+    );
+}
+
+#[test]
+fn deserialize_apps_config_with_account_aliases() {
+    let cfg: AppsConfigToml = toml::from_str(
+        r#"
+            [connector_gmail]
+            default_account = "personal"
+            ask_account_when_unspecified = false
+
+            [connector_gmail.accounts.personal]
+            name = "Personal"
+            description = "Use for family and personal email."
+
+            [connector_gmail.accounts.work]
+            name = "Work"
+            description = "Use for company mail."
+            default = true
+        "#,
+    )
+    .expect("should deserialize app account aliases");
+
+    assert_eq!(
+        cfg,
+        AppsConfigToml {
+            default: None,
+            apps: HashMap::from([(
+                "connector_gmail".to_string(),
+                AppConfig {
+                    enabled: true,
+                    default_account: Some("personal".to_string()),
+                    ask_account_when_unspecified: Some(false),
+                    accounts: HashMap::from([
+                        (
+                            "personal".to_string(),
+                            AppAccountConfig {
+                                name: Some("Personal".to_string()),
+                                description: Some("Use for family and personal email.".to_string()),
+                                default: false,
+                            },
+                        ),
+                        (
+                            "work".to_string(),
+                            AppAccountConfig {
+                                name: Some("Work".to_string()),
+                                description: Some("Use for company mail.".to_string()),
+                                default: true,
+                            },
+                        ),
+                    ]),
+                    ..Default::default()
+                },
+            )]),
         }
     );
 }

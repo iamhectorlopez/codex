@@ -3,6 +3,7 @@ use app_test_support::TestAppServer;
 use app_test_support::test_path_buf_with_windows;
 use app_test_support::test_tmp_path_buf;
 use app_test_support::to_response;
+use codex_app_server_protocol::AppAccountConfig;
 use codex_app_server_protocol::AppConfig;
 use codex_app_server_protocol::AppToolApproval;
 use codex_app_server_protocol::ApprovalsReviewer;
@@ -337,6 +338,16 @@ enabled = false
 approvals_reviewer = "user"
 destructive_enabled = false
 default_tools_approval_mode = "prompt"
+default_account = "personal"
+ask_account_when_unspecified = false
+
+[apps.app1.accounts.personal]
+name = "Personal"
+description = "Use for family and personal tasks."
+
+[apps.app1.accounts.work]
+name = "Work"
+description = "Use for company mail and projects."
 "#,
     )?;
     let codex_home_path = codex_home.path().canonicalize()?;
@@ -376,6 +387,26 @@ default_tools_approval_mode = "prompt"
                     default_tools_approval_mode: Some(AppToolApproval::Prompt),
                     default_tools_enabled: None,
                     tools: None,
+                    default_account: Some("personal".to_string()),
+                    ask_account_when_unspecified: Some(false),
+                    accounts: std::collections::HashMap::from([
+                        (
+                            "personal".to_string(),
+                            AppAccountConfig {
+                                name: Some("Personal".to_string()),
+                                description: Some("Use for family and personal tasks.".to_string()),
+                                default: false,
+                            },
+                        ),
+                        (
+                            "work".to_string(),
+                            AppAccountConfig {
+                                name: Some("Work".to_string()),
+                                description: Some("Use for company mail and projects.".to_string()),
+                                default: false,
+                            },
+                        ),
+                    ]),
                 },
             )]),
         })

@@ -1900,6 +1900,7 @@ async fn persist_codex_app_tool_approval_writes_tool_override() {
                             },
                         )]),
                     }),
+                    ..Default::default()
                 },
             )]),
         })

@@ -45,6 +45,11 @@ use codex_mcp::host_owned_codex_apps_enabled;
 use codex_mcp::with_codex_apps_mcp;
 
 const CONNECTORS_READY_TIMEOUT_ON_EMPTY_TOOLS: Duration = Duration::from_secs(30);
+const MAX_ACCOUNT_GUIDANCE_APPS: usize = 20;
+const MAX_ACCOUNT_ALIASES_PER_APP: usize = 12;
+const MAX_ACCOUNT_ALIAS_CHARS: usize = 80;
+const MAX_ACCOUNT_NAME_CHARS: usize = 80;
+const MAX_ACCOUNT_DESCRIPTION_CHARS: usize = 240;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct AppToolPolicy {
@@ -83,6 +88,22 @@ static ACCESSIBLE_CONNECTORS_CACHE: LazyLock<StdMutex<Option<CachedAccessibleCon
 pub struct AccessibleConnectorsStatus {
     pub connectors: Vec<AppInfo>,
     pub codex_apps_ready: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct AppAccountAliasGuidance {
+    pub key: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub is_default: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct AppAccountSelectionGuidance {
+    pub app_id: String,
+    pub app_name: String,
+    pub accounts: Vec<AppAccountAliasGuidance>,
+    pub ask_when_unspecified: bool,
 }
 
 pub async fn list_accessible_connectors_from_mcp_tools(
@@ -624,6 +645,107 @@ fn read_user_apps_config(config: &Config) -> Option<AppsConfigToml> {
         .and_then(|table| table.get("apps"))
         .cloned()
         .and_then(|value| AppsConfigToml::deserialize(value).ok())
+}
+
+pub(crate) fn app_account_selection_guidance(
+    config: &Config,
+    connectors: &[AppInfo],
+) -> Vec<AppAccountSelectionGuidance> {
+    let Some(apps_config) = read_user_apps_config(config) else {
+        return Vec::new();
+    };
+
+    let mut guidance = connectors
+        .iter()
+        .filter(|connector| connector.is_accessible && connector.is_enabled)
+        .filter_map(|connector| {
+            let app_config = apps_config.apps.get(connector.id.as_str())?;
+            if app_config.accounts.is_empty() {
+                return None;
+            }
+
+            let default_account = app_config.default_account.as_deref().and_then(str_trimmed);
+            let mut accounts = app_config
+                .accounts
+                .iter()
+                .filter_map(|(key, account)| {
+                    let raw_key = str_trimmed(key)?;
+                    let key = bounded_non_empty_prompt_string(raw_key, MAX_ACCOUNT_ALIAS_CHARS)?;
+                    let name = account
+                        .name
+                        .as_deref()
+                        .and_then(|name| {
+                            bounded_non_empty_prompt_string(name, MAX_ACCOUNT_NAME_CHARS)
+                        })
+                        .unwrap_or_else(|| key.clone());
+                    let description = account.description.as_deref().and_then(|description| {
+                        bounded_non_empty_prompt_string(description, MAX_ACCOUNT_DESCRIPTION_CHARS)
+                    });
+                    let is_default = account.default || default_account == Some(raw_key);
+                    Some(AppAccountAliasGuidance {
+                        key,
+                        name,
+                        description,
+                        is_default,
+                    })
+                })
+                .collect::<Vec<_>>();
+
+            if accounts.is_empty() {
+                return None;
+            }
+
+            accounts.sort_by(|left, right| {
+                right
+                    .is_default
+                    .cmp(&left.is_default)
+                    .then_with(|| left.key.cmp(&right.key))
+            });
+            accounts.truncate(MAX_ACCOUNT_ALIASES_PER_APP);
+            let default_count = accounts.iter().filter(|account| account.is_default).count();
+            let ask_when_unspecified = if default_count == 1 {
+                app_config.ask_account_when_unspecified.unwrap_or(false)
+            } else {
+                true
+            };
+
+            Some(AppAccountSelectionGuidance {
+                app_id: connector.id.clone(),
+                app_name: connector.name.clone(),
+                accounts,
+                ask_when_unspecified,
+            })
+        })
+        .collect::<Vec<_>>();
+
+    guidance.sort_by(|left, right| {
+        left.app_name
+            .cmp(&right.app_name)
+            .then_with(|| left.app_id.cmp(&right.app_id))
+    });
+    guidance.truncate(MAX_ACCOUNT_GUIDANCE_APPS);
+    guidance
+}
+
+fn str_trimmed(value: &str) -> Option<&str> {
+    let trimmed = value.trim();
+    (!trimmed.is_empty()).then_some(trimmed)
+}
+
+fn bounded_non_empty_prompt_string(value: &str, max_chars: usize) -> Option<String> {
+    let normalized = value.split_whitespace().collect::<Vec<_>>().join(" ");
+    str_trimmed(&normalized).map(|trimmed| bounded_prompt_string(trimmed, max_chars))
+}
+
+fn bounded_prompt_string(value: &str, max_chars: usize) -> String {
+    if value.chars().count() <= max_chars {
+        return value.to_string();
+    }
+
+    let truncated_len = max_chars.saturating_sub(3);
+    let mut truncated = value.chars().take(truncated_len).collect::<String>();
+    truncated.push_str("...");
+    truncated
 }
 
 fn apply_requirements_apps_constraints(

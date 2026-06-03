@@ -197,6 +197,16 @@ pub struct AppToolsConfig {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export_to = "v2/")]
+pub struct AppAccountConfig {
+    pub name: Option<String>,
+    pub description: Option<String>,
+    #[serde(default)]
+    pub default: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export_to = "v2/")]
 pub struct AppConfig {
     #[serde(default = "default_enabled")]
     pub enabled: bool,
@@ -206,6 +216,10 @@ pub struct AppConfig {
     pub default_tools_approval_mode: Option<AppToolApproval>,
     pub default_tools_enabled: Option<bool>,
     pub tools: Option<AppToolsConfig>,
+    pub default_account: Option<String>,
+    pub ask_account_when_unspecified: Option<bool>,
+    #[serde(default)]
+    pub accounts: HashMap<String, AppAccountConfig>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, TS)]

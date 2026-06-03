@@ -1262,7 +1262,26 @@ async fn includes_apps_guidance_as_developer_message_for_chatgpt_auth() {
     )
     .await;
 
+    let codex_home = Arc::new(TempDir::new().unwrap());
+    std::fs::write(
+        codex_home.path().join("config.toml"),
+        r#"
+[apps.calendar]
+default_account = "personal"
+
+[apps.calendar.accounts.personal]
+name = "Personal"
+description = "Use for personal calendar events."
+
+[apps.calendar.accounts.work]
+name = "Work"
+description = "Use for company calendar events."
+"#,
+    )
+    .expect("write config.toml");
+
     let mut builder = test_codex()
+        .with_home(codex_home)
         .with_auth(create_dummy_codex_auth())
         .with_config(move |config| {
             config
@@ -1301,6 +1320,29 @@ async fn includes_apps_guidance_as_developer_message_for_chatgpt_auth() {
     assert!(
         message_input_text_contains(&request, "developer", apps_snippet),
         "expected apps guidance in a developer message, got {:?}",
+        request.body_json()["input"]
+    );
+    assert!(
+        message_input_text_contains(&request, "developer", "Configured app accounts:"),
+        "expected app account guidance in a developer message, got {:?}",
+        request.body_json()["input"]
+    );
+    assert!(
+        message_input_text_contains(
+            &request,
+            "developer",
+            "`Personal` (alias `personal`) (default) - Use for personal calendar events."
+        ),
+        "expected Personal account alias in apps guidance, got {:?}",
+        request.body_json()["input"]
+    );
+    assert!(
+        message_input_text_contains(
+            &request,
+            "developer",
+            "Rule: if the user does not specify an account, use `Personal`."
+        ),
+        "expected default account rule in apps guidance, got {:?}",
         request.body_json()["input"]
     );
 

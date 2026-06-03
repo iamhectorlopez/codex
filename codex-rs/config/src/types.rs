@@ -417,6 +417,26 @@ pub struct AppToolsConfig {
     pub tools: HashMap<String, AppToolConfig>,
 }
 
+/// User-facing account alias for an app/connector.
+///
+/// These aliases are prompt-routing metadata only. They do not store
+/// credentials or create additional OAuth sessions.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Default, JsonSchema)]
+#[schemars(deny_unknown_fields)]
+pub struct AppAccountConfig {
+    /// User-facing account label. Defaults to the account alias key.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+
+    /// Short guidance describing when this account should be used.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+
+    /// Marks this alias as the account to use when the user does not specify one.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub default: bool,
+}
+
 /// Config values for a single app/connector.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default, JsonSchema)]
 #[schemars(deny_unknown_fields)]
@@ -448,6 +468,19 @@ pub struct AppConfig {
     /// Per-tool settings for this app.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tools: Option<AppToolsConfig>,
+
+    /// Account alias key to use when the user does not specify an account.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_account: Option<String>,
+
+    /// When true, Codex should ask before using this app if the user did not
+    /// specify an account alias.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ask_account_when_unspecified: Option<bool>,
+
+    /// User-defined account aliases for model-facing account selection.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub accounts: HashMap<String, AppAccountConfig>,
 }
 
 /// App/connector settings loaded from `config.toml`.

@@ -98,10 +98,36 @@
       },
       "type": "object"
     },
+    "AppAccountConfig": {
+      "additionalProperties": false,
+      "description": "User-facing account alias for an app/connector.\n\nThese aliases are prompt-routing metadata only. They do not store credentials or create additional OAuth sessions.",
+      "properties": {
+        "default": {
+          "description": "Marks this alias as the account to use when the user does not specify one.",
+          "type": "boolean"
+        },
+        "description": {
+          "description": "Short guidance describing when this account should be used.",
+          "type": "string"
+        },
+        "name": {
+          "description": "User-facing account label. Defaults to the account alias key.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "AppConfig": {
       "additionalProperties": false,
       "description": "Config values for a single app/connector.",
       "properties": {
+        "accounts": {
+          "additionalProperties": {
+            "$ref": "#/definitions/AppAccountConfig"
+          },
+          "description": "User-defined account aliases for model-facing account selection.",
+          "type": "object"
+        },
         "approvals_reviewer": {
           "allOf": [
             {
@@ -109,6 +135,14 @@
             }
           ],
           "description": "Reviewer for approval prompts from this app, overriding the thread default."
+        },
+        "ask_account_when_unspecified": {
+          "description": "When true, Codex should ask before using this app if the user did not specify an account alias.",
+          "type": "boolean"
+        },
+        "default_account": {
+          "description": "Account alias key to use when the user does not specify an account.",
+          "type": "string"
         },
         "default_tools_approval_mode": {
           "allOf": [

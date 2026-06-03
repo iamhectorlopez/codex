@@ -264,6 +264,83 @@ fn accessible_connectors_from_mcp_tools_preserves_description() {
     );
 }
 
+#[tokio::test]
+async fn app_account_selection_guidance_reads_aliases_from_config() {
+    let codex_home = tempdir().expect("tempdir should succeed");
+    std::fs::write(
+        codex_home.path().join(CONFIG_TOML_FILE),
+        r#"
+[apps.connector_gmail]
+default_account = "personal"
+
+[apps.connector_gmail.accounts.personal]
+name = "Personal"
+description = "Use for family and personal email."
+
+[apps.connector_gmail.accounts.work]
+name = "Work"
+description = "Use for company mail."
+
+[apps.connector_calendar]
+ask_account_when_unspecified = false
+
+[apps.connector_calendar.accounts.school]
+name = "University"
+description = "Use for classes and campus events."
+"#,
+    )
+    .expect("write config");
+    let config = ConfigBuilder::default()
+        .codex_home(codex_home.path().to_path_buf())
+        .build()
+        .await
+        .expect("config should build");
+
+    let mut gmail = app("connector_gmail");
+    gmail.name = "Gmail".to_string();
+    gmail.is_accessible = true;
+
+    let mut calendar = app("connector_calendar");
+    calendar.name = "Google Calendar".to_string();
+    calendar.is_accessible = true;
+
+    assert_eq!(
+        app_account_selection_guidance(&config, &[calendar, gmail]),
+        vec![
+            AppAccountSelectionGuidance {
+                app_id: "connector_gmail".to_string(),
+                app_name: "Gmail".to_string(),
+                accounts: vec![
+                    AppAccountAliasGuidance {
+                        key: "personal".to_string(),
+                        name: "Personal".to_string(),
+                        description: Some("Use for family and personal email.".to_string()),
+                        is_default: true,
+                    },
+                    AppAccountAliasGuidance {
+                        key: "work".to_string(),
+                        name: "Work".to_string(),
+                        description: Some("Use for company mail.".to_string()),
+                        is_default: false,
+                    },
+                ],
+                ask_when_unspecified: false,
+            },
+            AppAccountSelectionGuidance {
+                app_id: "connector_calendar".to_string(),
+                app_name: "Google Calendar".to_string(),
+                accounts: vec![AppAccountAliasGuidance {
+                    key: "school".to_string(),
+                    name: "University".to_string(),
+                    description: Some("Use for classes and campus events.".to_string()),
+                    is_default: false,
+                }],
+                ask_when_unspecified: true,
+            },
+        ]
+    );
+}
+
 #[test]
 fn app_tool_policy_uses_global_defaults_for_destructive_hints() {
     let apps_config = AppsConfigToml {
@@ -384,6 +461,7 @@ fn app_is_enabled_prefers_per_app_override_over_default() {
                 default_tools_approval_mode: None,
                 default_tools_enabled: None,
                 tools: None,
+                ..Default::default()
             },
         )]),
     };
@@ -1000,6 +1078,7 @@ fn app_tool_policy_allows_per_app_enable_when_default_is_disabled() {
                 default_tools_approval_mode: None,
                 default_tools_enabled: None,
                 tools: None,
+                ..Default::default()
             },
         )]),
     };
@@ -1046,6 +1125,7 @@ fn app_tool_policy_per_tool_enabled_true_overrides_app_level_disable_flags() {
                         },
                     )]),
                 }),
+                ..Default::default()
             },
         )]),
     };
@@ -1082,6 +1162,7 @@ fn app_tool_policy_default_tools_enabled_true_overrides_app_level_tool_hints() {
                 default_tools_approval_mode: None,
                 default_tools_enabled: Some(true),
                 tools: None,
+                ..Default::default()
             },
         )]),
     };
@@ -1118,6 +1199,7 @@ fn app_tool_policy_default_tools_enabled_false_overrides_app_level_tool_hints() 
                 default_tools_approval_mode: Some(AppToolApproval::Approve),
                 default_tools_enabled: Some(false),
                 tools: None,
+                ..Default::default()
             },
         )]),
     };
@@ -1158,6 +1240,7 @@ fn app_tool_policy_uses_default_tools_approval_mode() {
                 tools: Some(AppToolsConfig {
                     tools: HashMap::new(),
                 }),
+                ..Default::default()
             },
         )]),
     };
@@ -1204,6 +1287,7 @@ fn app_tool_policy_matches_prefix_stripped_tool_name_for_tool_config() {
                         },
                     )]),
                 }),
+                ..Default::default()
             },
         )]),
     };

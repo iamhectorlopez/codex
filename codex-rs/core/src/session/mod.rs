@@ -2824,9 +2824,14 @@ impl Session {
                     &turn_context.config,
                 )
                 .await;
-            if let Some(apps_instructions) =
-                AppsInstructions::from_connectors(&accessible_and_enabled_connectors)
-            {
+            let app_account_guidance = connectors::app_account_selection_guidance(
+                &turn_context.config,
+                &accessible_and_enabled_connectors,
+            );
+            if let Some(apps_instructions) = AppsInstructions::from_connectors_with_account_guidance(
+                &accessible_and_enabled_connectors,
+                app_account_guidance,
+            ) {
                 developer_sections.push(apps_instructions.render());
             }
         }
