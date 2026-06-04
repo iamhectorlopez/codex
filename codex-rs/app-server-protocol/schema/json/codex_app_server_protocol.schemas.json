@@ -5915,6 +5915,32 @@
         },
         "type": "object"
       },
+      "AppAccountAliasInfo": {
+        "description": "User-configured account alias metadata for an app.",
+        "properties": {
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "isDefault",
+          "key",
+          "name"
+        ],
+        "type": "object"
+      },
       "AppAccountConfig": {
         "properties": {
           "default": {
@@ -5934,6 +5960,25 @@
             ]
           }
         },
+        "type": "object"
+      },
+      "AppAccountSelectionInfo": {
+        "description": "User-configured account selection metadata for an app.",
+        "properties": {
+          "aliases": {
+            "items": {
+              "$ref": "#/definitions/v2/AppAccountAliasInfo"
+            },
+            "type": "array"
+          },
+          "askWhenUnspecified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "aliases",
+          "askWhenUnspecified"
+        ],
         "type": "object"
       },
       "AppBranding": {
@@ -6149,6 +6194,13 @@
         "$schema": "http://json-schema.org/draft-07/schema#",
         "description": "EXPERIMENTAL - notification emitted when the app list changes.",
         "properties": {
+          "accountSelection": {
+            "additionalProperties": {
+              "$ref": "#/definitions/v2/AppAccountSelectionInfo"
+            },
+            "default": {},
+            "type": "object"
+          },
           "data": {
             "items": {
               "$ref": "#/definitions/v2/AppInfo"
@@ -6431,6 +6483,13 @@
         "$schema": "http://json-schema.org/draft-07/schema#",
         "description": "EXPERIMENTAL - app list response.",
         "properties": {
+          "accountSelection": {
+            "additionalProperties": {
+              "$ref": "#/definitions/v2/AppAccountSelectionInfo"
+            },
+            "default": {},
+            "type": "object"
+          },
           "data": {
             "items": {
               "$ref": "#/definitions/v2/AppInfo"

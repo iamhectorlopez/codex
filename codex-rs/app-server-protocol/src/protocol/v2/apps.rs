@@ -73,6 +73,26 @@ pub struct AppMetadata {
     pub show_in_composer_when_unlinked: Option<bool>,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, JsonSchema, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export_to = "v2/")]
+/// User-configured account alias metadata for an app.
+pub struct AppAccountAliasInfo {
+    pub key: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub is_default: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, JsonSchema, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export_to = "v2/")]
+/// User-configured account selection metadata for an app.
+pub struct AppAccountSelectionInfo {
+    pub aliases: Vec<AppAccountAliasInfo>,
+    pub ask_when_unspecified: bool,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export_to = "v2/")]
@@ -132,6 +152,8 @@ impl From<AppInfo> for AppSummary {
 /// EXPERIMENTAL - app list response.
 pub struct AppsListResponse {
     pub data: Vec<AppInfo>,
+    #[serde(default)]
+    pub account_selection: HashMap<String, AppAccountSelectionInfo>,
     /// Opaque cursor to pass to the next call to continue after the last item.
     /// If None, there are no more items to return.
     pub next_cursor: Option<String>,
@@ -143,4 +165,6 @@ pub struct AppsListResponse {
 /// EXPERIMENTAL - notification emitted when the app list changes.
 pub struct AppListUpdatedNotification {
     pub data: Vec<AppInfo>,
+    #[serde(default)]
+    pub account_selection: HashMap<String, AppAccountSelectionInfo>,
 }

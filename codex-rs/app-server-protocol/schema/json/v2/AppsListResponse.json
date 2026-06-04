@@ -1,6 +1,51 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "definitions": {
+    "AppAccountAliasInfo": {
+      "description": "User-configured account alias metadata for an app.",
+      "properties": {
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "isDefault": {
+          "type": "boolean"
+        },
+        "key": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "isDefault",
+        "key",
+        "name"
+      ],
+      "type": "object"
+    },
+    "AppAccountSelectionInfo": {
+      "description": "User-configured account selection metadata for an app.",
+      "properties": {
+        "aliases": {
+          "items": {
+            "$ref": "#/definitions/AppAccountAliasInfo"
+          },
+          "type": "array"
+        },
+        "askWhenUnspecified": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "aliases",
+        "askWhenUnspecified"
+      ],
+      "type": "object"
+    },
     "AppBranding": {
       "description": "EXPERIMENTAL - app metadata returned by app-list APIs.",
       "properties": {
@@ -261,6 +306,13 @@
   },
   "description": "EXPERIMENTAL - app list response.",
   "properties": {
+    "accountSelection": {
+      "additionalProperties": {
+        "$ref": "#/definitions/AppAccountSelectionInfo"
+      },
+      "default": {},
+      "type": "object"
+    },
     "data": {
       "items": {
         "$ref": "#/definitions/AppInfo"

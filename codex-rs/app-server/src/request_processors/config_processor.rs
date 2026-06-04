@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use super::account_selection_for_connectors;
 use crate::config_manager::ConfigManager;
 use crate::config_manager_service::ConfigManagerError;
 use crate::error_code::internal_error;
@@ -252,9 +253,13 @@ impl ConfigRequestProcessor {
                 ),
                 &config,
             );
+            let account_selection = account_selection_for_connectors(&config, data.as_slice());
             outgoing
                 .send_server_notification(ServerNotification::AppListUpdated(
-                    AppListUpdatedNotification { data },
+                    AppListUpdatedNotification {
+                        data,
+                        account_selection,
+                    },
                 ))
                 .await;
         });

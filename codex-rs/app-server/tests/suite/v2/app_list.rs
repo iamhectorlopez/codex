@@ -19,6 +19,8 @@ use axum::http::StatusCode;
 use axum::http::Uri;
 use axum::http::header::AUTHORIZATION;
 use axum::routing::get;
+use codex_app_server_protocol::AppAccountAliasInfo;
+use codex_app_server_protocol::AppAccountSelectionInfo;
 use codex_app_server_protocol::AppBranding;
 use codex_app_server_protocol::AppInfo;
 use codex_app_server_protocol::AppListUpdatedNotification;
@@ -82,7 +84,9 @@ async fn list_apps_returns_empty_when_connectors_disabled() -> Result<()> {
     )
     .await??;
 
-    let AppsListResponse { data, next_cursor } = to_response(response)?;
+    let AppsListResponse {
+        data, next_cursor, ..
+    } = to_response(response)?;
 
     assert!(data.is_empty());
     assert!(next_cursor.is_none());
@@ -142,7 +146,9 @@ async fn list_apps_returns_empty_with_api_key_auth() -> Result<()> {
     )
     .await??;
 
-    let AppsListResponse { data, next_cursor } = to_response(response)?;
+    let AppsListResponse {
+        data, next_cursor, ..
+    } = to_response(response)?;
     assert!(data.is_empty());
     assert!(next_cursor.is_none());
 
@@ -204,7 +210,9 @@ async fn list_apps_returns_empty_when_workspace_codex_plugins_disabled() -> Resu
     )
     .await??;
 
-    let AppsListResponse { data, next_cursor } = to_response(response)?;
+    let AppsListResponse {
+        data, next_cursor, ..
+    } = to_response(response)?;
     assert!(data.is_empty());
     assert!(next_cursor.is_none());
 
@@ -287,6 +295,7 @@ connectors = false
     let AppsListResponse {
         data: global_data,
         next_cursor: global_next_cursor,
+        ..
     } = to_response(global_response)?;
     assert!(global_data.is_empty());
     assert!(global_next_cursor.is_none());
@@ -307,6 +316,7 @@ connectors = false
     let AppsListResponse {
         data: thread_data,
         next_cursor: thread_next_cursor,
+        ..
     } = to_response(thread_response)?;
     assert!(thread_data.iter().any(|app| app.id == "beta"));
     assert!(thread_next_cursor.is_none());
@@ -371,7 +381,9 @@ async fn list_apps_keeps_apps_with_app_only_tools_accessible() -> Result<()> {
         mcp.read_stream_until_response_message(RequestId::Integer(request_id)),
     )
     .await??;
-    let AppsListResponse { data, next_cursor } = to_response(response)?;
+    let AppsListResponse {
+        data, next_cursor, ..
+    } = to_response(response)?;
 
     assert_eq!(data.len(), 1);
     assert_eq!(data[0].id, "beta");
@@ -448,11 +460,120 @@ enabled = false
     let AppsListResponse {
         data: response_data,
         next_cursor,
+        ..
     } = to_response(response)?;
     assert!(next_cursor.is_none());
     assert_eq!(response_data.len(), 1);
     assert_eq!(response_data[0].id, "beta");
     assert!(!response_data[0].is_enabled);
+
+    server_handle.abort();
+    let _ = server_handle.await;
+    Ok(())
+}
+
+#[tokio::test]
+async fn list_apps_includes_configured_account_selection() -> Result<()> {
+    let connectors = vec![AppInfo {
+        id: "beta".to_string(),
+        name: "Beta".to_string(),
+        description: Some("Beta connector".to_string()),
+        logo_url: None,
+        logo_url_dark: None,
+        distribution_channel: None,
+        branding: None,
+        app_metadata: None,
+        labels: None,
+        install_url: None,
+        is_accessible: false,
+        is_enabled: true,
+        plugin_display_names: Vec::new(),
+    }];
+    let (server_url, server_handle) =
+        start_apps_server_with_delays(connectors, Vec::new(), Duration::ZERO, Duration::ZERO)
+            .await?;
+
+    let codex_home = TempDir::new()?;
+    std::fs::write(
+        codex_home.path().join("config.toml"),
+        format!(
+            r#"
+chatgpt_base_url = "{server_url}"
+mcp_oauth_credentials_store = "file"
+
+[features]
+connectors = true
+
+[apps.beta]
+default_account = "personal"
+ask_account_when_unspecified = false
+
+[apps.beta.accounts.personal]
+name = "Personal"
+description = "Use for personal projects."
+
+[apps.beta.accounts.work]
+name = "Work"
+description = "Use for company projects."
+"#
+        ),
+    )?;
+    write_chatgpt_auth(
+        codex_home.path(),
+        ChatGptAuthFixture::new("chatgpt-token")
+            .account_id("account-123")
+            .chatgpt_user_id("user-account-selection")
+            .chatgpt_account_id("account-123"),
+        AuthCredentialsStoreMode::File,
+    )?;
+
+    let mut mcp = TestAppServer::new(codex_home.path()).await?;
+    timeout(DEFAULT_TIMEOUT, mcp.initialize()).await??;
+
+    let request_id = mcp
+        .send_apps_list_request(AppsListParams {
+            limit: None,
+            cursor: None,
+            thread_id: None,
+            force_refetch: false,
+        })
+        .await?;
+
+    let response: JSONRPCResponse = timeout(
+        DEFAULT_TIMEOUT,
+        mcp.read_stream_until_response_message(RequestId::Integer(request_id)),
+    )
+    .await??;
+    let AppsListResponse {
+        data: response_data,
+        account_selection,
+        next_cursor,
+    } = to_response(response)?;
+
+    assert!(next_cursor.is_none());
+    assert_eq!(response_data.len(), 1);
+    assert_eq!(response_data[0].id, "beta");
+    assert!(!response_data[0].is_accessible);
+    assert_eq!(
+        account_selection.get("beta"),
+        Some(&AppAccountSelectionInfo {
+            aliases: vec![
+                AppAccountAliasInfo {
+                    key: "personal".to_string(),
+                    name: "Personal".to_string(),
+                    description: Some("Use for personal projects.".to_string()),
+                    is_default: true,
+                },
+                AppAccountAliasInfo {
+                    key: "work".to_string(),
+                    name: "Work".to_string(),
+                    description: Some("Use for company projects.".to_string()),
+                    is_default: false,
+                },
+            ],
+            ask_when_unspecified: false,
+        })
+    );
 
     server_handle.abort();
     let _ = server_handle.await;
@@ -623,6 +744,7 @@ async fn list_apps_emits_updates_and_returns_after_both_lists_load() -> Result<(
     let AppsListResponse {
         data: response_data,
         next_cursor,
+        ..
     } = to_response(response)?;
     assert_eq!(response_data, expected_merged);
     assert!(next_cursor.is_none());
@@ -749,7 +871,9 @@ async fn list_apps_waits_for_accessible_data_before_emitting_directory_updates()
         mcp.read_stream_until_response_message(RequestId::Integer(request_id)),
     )
     .await??;
-    let AppsListResponse { data, next_cursor } = to_response(response)?;
+    let AppsListResponse {
+        data, next_cursor, ..
+    } = to_response(response)?;
     assert_eq!(data, expected);
     assert!(next_cursor.is_none());
 
@@ -839,7 +963,9 @@ async fn list_apps_does_not_emit_empty_interim_updates() -> Result<()> {
         mcp.read_stream_until_response_message(RequestId::Integer(request_id)),
     )
     .await??;
-    let AppsListResponse { data, next_cursor } = to_response(response)?;
+    let AppsListResponse {
+        data, next_cursor, ..
+    } = to_response(response)?;
     assert_eq!(data, expected);
     assert!(next_cursor.is_none());
 
@@ -921,6 +1047,7 @@ async fn list_apps_paginates_results() -> Result<()> {
     let AppsListResponse {
         data: first_page,
         next_cursor: first_cursor,
+        ..
     } = to_response(first_response)?;
 
     let expected_first = vec![AppInfo {
@@ -965,6 +1092,7 @@ async fn list_apps_paginates_results() -> Result<()> {
     let AppsListResponse {
         data: second_page,
         next_cursor: second_cursor,
+        ..
     } = to_response(second_response)?;
 
     let expected_second = vec![AppInfo {
@@ -1041,6 +1169,7 @@ async fn list_apps_force_refetch_preserves_previous_cache_on_failure() -> Result
     let AppsListResponse {
         data: initial_data,
         next_cursor: initial_next_cursor,
+        ..
     } = to_response(initial_response)?;
     assert!(initial_next_cursor.is_none());
     assert_eq!(initial_data.len(), 1);
@@ -1086,6 +1215,7 @@ async fn list_apps_force_refetch_preserves_previous_cache_on_failure() -> Result
     let AppsListResponse {
         data: cached_data,
         next_cursor: cached_next_cursor,
+        ..
     } = to_response(cached_response)?;
 
     assert_eq!(cached_data, initial_data);
@@ -1224,6 +1354,7 @@ async fn list_apps_force_refetch_patches_updates_from_cached_snapshots() -> Resu
     let AppsListResponse {
         data: warm_data,
         next_cursor: warm_next_cursor,
+        ..
     } = to_response(warm_response)?;
     assert_eq!(warm_data, warm_second_update.data);
     assert!(warm_next_cursor.is_none());
@@ -1327,6 +1458,7 @@ async fn list_apps_force_refetch_patches_updates_from_cached_snapshots() -> Resu
     let AppsListResponse {
         data: refetch_data,
         next_cursor: refetch_next_cursor,
+        ..
     } = to_response(refetch_response)?;
     assert_eq!(refetch_data, expected_final);
     assert!(refetch_next_cursor.is_none());

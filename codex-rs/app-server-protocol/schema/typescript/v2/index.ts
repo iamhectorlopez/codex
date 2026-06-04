@@ -14,7 +14,9 @@ export type { AdditionalNetworkPermissions } from "./AdditionalNetworkPermission
 export type { AdditionalPermissionProfile } from "./AdditionalPermissionProfile";
 export type { AgentMessageDeltaNotification } from "./AgentMessageDeltaNotification";
 export type { AnalyticsConfig } from "./AnalyticsConfig";
+export type { AppAccountAliasInfo } from "./AppAccountAliasInfo";
 export type { AppAccountConfig } from "./AppAccountConfig";
+export type { AppAccountSelectionInfo } from "./AppAccountSelectionInfo";
 export type { AppBranding } from "./AppBranding";
 export type { AppInfo } from "./AppInfo";
 export type { AppListUpdatedNotification } from "./AppListUpdatedNotification";

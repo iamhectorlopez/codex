@@ -91,7 +91,7 @@ pub struct AccessibleConnectorsStatus {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct AppAccountAliasGuidance {
+pub struct AppAccountAliasGuidance {
     pub key: String,
     pub name: String,
     pub description: Option<String>,
@@ -99,7 +99,7 @@ pub(crate) struct AppAccountAliasGuidance {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct AppAccountSelectionGuidance {
+pub struct AppAccountSelectionGuidance {
     pub app_id: String,
     pub app_name: String,
     pub accounts: Vec<AppAccountAliasGuidance>,
@@ -651,13 +651,30 @@ pub(crate) fn app_account_selection_guidance(
     config: &Config,
     connectors: &[AppInfo],
 ) -> Vec<AppAccountSelectionGuidance> {
+    app_account_selection(config, connectors, |connector| {
+        connector.is_accessible && connector.is_enabled
+    })
+}
+
+pub fn app_account_selection_for_app_list(
+    config: &Config,
+    connectors: &[AppInfo],
+) -> Vec<AppAccountSelectionGuidance> {
+    app_account_selection(config, connectors, |_| true)
+}
+
+fn app_account_selection(
+    config: &Config,
+    connectors: &[AppInfo],
+    include_connector: impl Fn(&AppInfo) -> bool,
+) -> Vec<AppAccountSelectionGuidance> {
     let Some(apps_config) = read_user_apps_config(config) else {
         return Vec::new();
     };
 
     let mut guidance = connectors
         .iter()
-        .filter(|connector| connector.is_accessible && connector.is_enabled)
+        .filter(|connector| include_connector(connector))
         .filter_map(|connector| {
             let app_config = apps_config.apps.get(connector.id.as_str())?;
             if app_config.accounts.is_empty() {

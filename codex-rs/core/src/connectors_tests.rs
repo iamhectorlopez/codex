@@ -341,6 +341,47 @@ description = "Use for classes and campus events."
     );
 }
 
+#[tokio::test]
+async fn app_account_selection_for_app_list_includes_disconnected_apps() {
+    let codex_home = tempdir().expect("tempdir should succeed");
+    std::fs::write(
+        codex_home.path().join(CONFIG_TOML_FILE),
+        r#"
+[apps.connector_gmail]
+ask_account_when_unspecified = true
+
+[apps.connector_gmail.accounts.work]
+name = "Work"
+description = "Use for company mail."
+"#,
+    )
+    .expect("write config");
+    let config = ConfigBuilder::default()
+        .codex_home(codex_home.path().to_path_buf())
+        .build()
+        .await
+        .expect("config should build");
+
+    let mut gmail = app("connector_gmail");
+    gmail.name = "Gmail".to_string();
+    gmail.is_accessible = false;
+
+    assert_eq!(
+        app_account_selection_for_app_list(&config, &[gmail]),
+        vec![AppAccountSelectionGuidance {
+            app_id: "connector_gmail".to_string(),
+            app_name: "Gmail".to_string(),
+            accounts: vec![AppAccountAliasGuidance {
+                key: "work".to_string(),
+                name: "Work".to_string(),
+                description: Some("Use for company mail.".to_string()),
+                is_default: false,
+            }],
+            ask_when_unspecified: true,
+        }]
+    );
+}
+
 #[test]
 fn app_tool_policy_uses_global_defaults_for_destructive_hints() {
     let apps_config = AppsConfigToml {

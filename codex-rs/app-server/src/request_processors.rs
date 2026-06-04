@@ -27,6 +27,8 @@ use codex_app_server_protocol::AddCreditsNudgeCreditType;
 use codex_app_server_protocol::AddCreditsNudgeEmailStatus;
 use codex_app_server_protocol::AdditionalContextEntry;
 use codex_app_server_protocol::AdditionalContextKind;
+use codex_app_server_protocol::AppAccountAliasInfo;
+use codex_app_server_protocol::AppAccountSelectionInfo;
 use codex_app_server_protocol::AppInfo;
 use codex_app_server_protocol::AppListUpdatedNotification;
 use codex_app_server_protocol::AppSummary;
@@ -539,4 +541,32 @@ pub(crate) fn build_api_turns_from_rollout_items(items: &[RolloutItem]) -> Vec<T
         }
     }
     builder.finish()
+}
+
+fn account_selection_for_connectors(
+    config: &Config,
+    connectors: &[AppInfo],
+) -> HashMap<String, AppAccountSelectionInfo> {
+    connectors::app_account_selection_for_app_list(config, connectors)
+        .into_iter()
+        .map(|selection| {
+            let aliases = selection
+                .accounts
+                .into_iter()
+                .map(|account| AppAccountAliasInfo {
+                    key: account.key,
+                    name: account.name,
+                    description: account.description,
+                    is_default: account.is_default,
+                })
+                .collect();
+            (
+                selection.app_id,
+                AppAccountSelectionInfo {
+                    aliases,
+                    ask_when_unspecified: selection.ask_when_unspecified,
+                },
+            )
+        })
+        .collect()
 }

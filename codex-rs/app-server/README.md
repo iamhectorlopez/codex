@@ -1693,7 +1693,7 @@ When `threadId` is provided, app feature gating (`Feature::Apps`) is evaluated u
 
 `app/list` returns after both accessible apps and directory apps are loaded. Set `forceRefetch: true` to bypass app caches and fetch fresh data from sources. Cache entries are only replaced when those refetches succeed.
 
-The server also emits `app/list/updated` notifications whenever either source (accessible apps or directory apps) finishes loading. Each notification includes the latest merged app list.
+The server also emits `app/list/updated` notifications whenever either source (accessible apps or directory apps) finishes loading. Each notification includes the latest merged app list and any configured account-selection metadata for those apps.
 
 ```json
 {
@@ -1714,7 +1714,8 @@ The server also emits `app/list/updated` notifications whenever either source (a
         "isAccessible": true,
         "isEnabled": true
       }
-    ]
+    ],
+    "accountSelection": {}
   }
 }
 ```
@@ -1750,6 +1751,34 @@ description = "Use for family and personal tasks."
 [apps.demo-app.accounts.work]
 name = "Work"
 description = "Use for company mail and projects."
+```
+
+`app/list` and `app/list/updated` also surface configured aliases in
+`accountSelection`, keyed by app id, so UI clients can render account rows before
+alias-specific OAuth sessions exist:
+
+```json
+{
+  "accountSelection": {
+    "demo-app": {
+      "aliases": [
+        {
+          "key": "personal",
+          "name": "Personal",
+          "description": "Use for family and personal tasks.",
+          "isDefault": true
+        },
+        {
+          "key": "work",
+          "name": "Work",
+          "description": "Use for company mail and projects.",
+          "isDefault": false
+        }
+      ],
+      "askWhenUnspecified": false
+    }
+  }
+}
 ```
 
 Invoke an app by inserting `$<app-slug>` in the text input. The slug is derived from the app name and lowercased with non-alphanumeric characters replaced by `-` (for example, "Demo App" becomes `$demo-app`). Add a `mention` input item (recommended) so the server uses the exact `app://<connector-id>` path rather than guessing by name. Plugins use the same `mention` item shape, but with `plugin://<plugin-name>@<marketplace-name>` paths from `plugin/installed` or `plugin/list`.

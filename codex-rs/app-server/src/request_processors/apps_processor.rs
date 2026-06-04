@@ -71,6 +71,7 @@ impl AppsRequestProcessor {
         {
             return Ok(Some(AppsListResponse {
                 data: Vec::new(),
+                account_selection: HashMap::new(),
                 next_cursor: None,
             }));
         }
@@ -81,6 +82,7 @@ impl AppsRequestProcessor {
         {
             return Ok(Some(AppsListResponse {
                 data: Vec::new(),
+                account_selection: HashMap::new(),
                 next_cursor: None,
             }));
         }
@@ -202,7 +204,10 @@ impl AppsRequestProcessor {
                 accessible_loaded,
                 all_loaded,
             ) {
-                send_app_list_updated_notification(outgoing, merged.clone()).await;
+                let account_selection =
+                    account_selection_for_connectors(&config, merged.as_slice());
+                send_app_list_updated_notification(outgoing, merged.clone(), account_selection)
+                    .await;
                 last_notified_apps = Some(merged);
             }
         }
@@ -262,12 +267,15 @@ impl AppsRequestProcessor {
                 all_loaded,
             ) && last_notified_apps.as_ref() != Some(&merged)
             {
-                send_app_list_updated_notification(outgoing, merged.clone()).await;
+                let account_selection =
+                    account_selection_for_connectors(&config, merged.as_slice());
+                send_app_list_updated_notification(outgoing, merged.clone(), account_selection)
+                    .await;
                 last_notified_apps = Some(merged.clone());
             }
 
             if accessible_loaded && all_loaded {
-                let response = paginate_apps(merged.as_slice(), start, limit)?;
+                let response = paginate_apps(merged.as_slice(), start, limit, &config)?;
                 return Ok((response, codex_apps_ready));
             }
         }
@@ -351,6 +359,7 @@ fn paginate_apps(
     connectors: &[AppInfo],
     start: usize,
     limit: Option<u32>,
+    config: &Config,
 ) -> Result<AppsListResponse, JSONRPCErrorError> {
     let total = connectors.len();
     if start > total {
@@ -362,22 +371,31 @@ fn paginate_apps(
     let effective_limit = limit.unwrap_or(total as u32).max(1) as usize;
     let end = start.saturating_add(effective_limit).min(total);
     let data = connectors[start..end].to_vec();
+    let account_selection = account_selection_for_connectors(config, data.as_slice());
     let next_cursor = if end < total {
         Some(end.to_string())
     } else {
         None
     };
 
-    Ok(AppsListResponse { data, next_cursor })
+    Ok(AppsListResponse {
+        data,
+        account_selection,
+        next_cursor,
+    })
 }
 
 async fn send_app_list_updated_notification(
     outgoing: &Arc<OutgoingMessageSender>,
     data: Vec<AppInfo>,
+    account_selection: HashMap<String, AppAccountSelectionInfo>,
 ) {
     outgoing
         .send_server_notification(ServerNotification::AppListUpdated(
-            AppListUpdatedNotification { data },
+            AppListUpdatedNotification {
+                data,
+                account_selection,
+            },
         ))
         .await;
 }
